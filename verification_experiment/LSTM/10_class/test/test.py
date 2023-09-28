@@ -15,39 +15,8 @@ from PIL import Image
 import pandas as pd
 
 
-batch_size = 256
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-class CsvDataset(Dataset):
-    def __init__(self):
-        super(CsvDataset, self).__init__()
-        self.feature_path = 'data_trans.csv'
-        self.label_path = 'data_label_10.csv'
-        feature_df_ = pd.read_csv(self.feature_path)
-        label_df_ = pd.read_csv(self.label_path)
-        assert feature_df_.columns.tolist()[1:] == label_df_[label_df_.columns[0]].tolist(), \
-            'feature name does not match label name'
-        self.feature = [feature_df_[i].tolist() for i in feature_df_.columns[1:]]
-        self.label = label_df_[label_df_.columns[1]]
-        assert len(self.feature) == len(self.label)
-        self.length = len(self.feature)
-
-    def __getitem__(self, index):
-        x = self.feature[index]
-        x = torch.Tensor(x)
-        #x = x.reshape(1, 1024)
-        x = x.view(1024, 1)
-
-        y = self.label[index]
-
-        return x, y
-
-    def __len__(self):
-        return self.length
-
-trainset = CsvDataset()
-
-trainloader = DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True)
 
 #_____________________测试集____________________________________________________________________________________________________
 
@@ -119,7 +88,7 @@ num_classes = 10
 
 D = LSTMClassifier(input_size, hidden_size, num_layers, num_classes)
 
-checkpoint = torch.load('./model/Discriminator_cuda_1680.pkl', map_location='cpu')
+checkpoint = torch.load('./model/Discriminator_cuda_1990.pkl', map_location='cpu')
 D.load_state_dict(checkpoint)
 D = D.to(device)
 D.eval()
@@ -139,70 +108,9 @@ d_real_train_accuracy_all = []
 test_loss_all = []  # 存放测试集损失的数组
 test_accur_all = []  # 存放测试集准确率的数组
 
-iter_count_all = []
-
+# iter_count_all = []
 
 for i in range(epoch):
-    train_bar = tqdm(trainloader)
-    train_num = 0.0
-
-    D_loss_real_cls_epoch = 0
-    d_real_train_accuracy = 0.0
-
-    for (x, y) in train_bar:
-        D.eval()
-        img = x
-        label = y
-    #
-    #     labels_onehot = np.zeros((img.shape[0], 10))           #28行，10列
-    #     labels_onehot[np.arange(img.shape[0]), label.numpy()] = 1     #根据or_data中label的数字，将对应数字序列的位置换成1
-    #
-    #     img = img.to(device)
-    #     img = Variable(img)
-    #
-    #     d_optimizer.zero_grad()  # 判别器D的梯度归零
-    #
-    #     # 类标签
-    #     real_cls_label = Variable(torch.from_numpy(labels_onehot).float()).to(device)  # 真的类别label相应为1  100*15(10)
-    #
-    #     # 真图片的损失
-    #     real_dis_out, real_cls_out = D(img)  # 真图片送入判别器D  得到真假输出 100*1 和分类输出100*15(10)
-    #
-    #     # 真图片的分类损失
-    #     input_a = real_cls_out.to(device)
-    #     target_a = label.to(device)
-    #     d_loss_real_cls = loss2(input_a, target_a)
-    #
-    #     #真实图片准确度
-    #     input_a_acc = torch.argmax(input_a, 1)
-    #     d_real_accuracy = torch.sum(input_a_acc == target_a)  # outputs == target的 即使预测正确的，统计预测正确的个数,从而计算准确率
-    #     d_real_train_accuracy = d_real_train_accuracy + d_real_accuracy  # 求训练集的准确率
-    #
-    #     d_loss_real_cls.backward()
-    #     d_optimizer.step()  # 更新判别器D参数
-    #
-        train_num += img.size(0)
-        iter_count += 1
-        iter_count_all.append(iter_count)
-    #
-    #     with torch.no_grad():                              #loss在每个epoch训练完后后重置
-    #         D_loss_real_cls_epoch += d_loss_real_cls.cpu().item()
-    #
-    # print(f"epoch：{i}， "
-    #       f"d_real_train_accuracy：{d_real_train_accuracy / train_num}, ")
-    #
-    # d_real_train_accuracy_all.append(d_real_train_accuracy.double().item() / train_num)  # 将训练的损失放到一个列表里 方便后续画图
-
-    # 求平均损失
-    # with torch.no_grad():
-    train_num = train_num/batch_size
-    D_loss_real_cls_epoch /= train_num
-    D_loss_real_cls_all.append(D_loss_real_cls_epoch)
-
-    print(f"epoch:{i},\n"
-          f"D_loss_real_cls:{D_loss_real_cls_epoch},"
-          )
-
     #测试集
     test_loss = 0  # 同上 测试损失
     test_accuracy = 0.0  # 测试准确率
@@ -227,18 +135,9 @@ for i in range(epoch):
     test_loss_all.append(test_loss.double().item() / test_num)
     test_accur_all.append(test_accuracy.double().item() / test_num)
 
-
-    # # 模型保存（10 epoch）
-    # if (i % 10 == 0) and (i != 0):
-    #     print(i)
-    #     torch.save(D.state_dict(), r'./ACGAN_model_save/Discriminator_cuda_%d.pkl' % i)
-
-
-data_loss = zip(iter_count_all,
-                test_loss_all,
+data_loss = zip(test_loss_all,
                 test_accur_all)
-header_name = ['iter_count',
-               'test_loss_all',
+header_name = ['test_loss_all',
                'test_accuracy_all']
 loss_csv = pd.DataFrame(columns=header_name, data=data_loss)
 loss_csv.to_csv('./loss/loss.csv', index=False)
